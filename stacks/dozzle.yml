@@ -1,0 +1,37 @@
+version: '3.3'
+services:
+  dozzle:
+    image: amir20/dozzle:latest
+    environment:
+      DOZZLE_FILTER: status=running
+      DOZZLE_LEVEL: info
+      DOZZLE_MODE: swarm
+      DOZZLE_TAILSIZE: '300'
+    volumes:
+     - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      mode: global
+      labels:
+        traefik.http.services.dozzle-svc.loadbalancer.server.port: '8080'
+        homepage.group: Services
+        traefik.http.routers.dozzle-rtr.rule: Host(`dozzle.donahuenet.xyz`)
+        homepage.href: https://dozzle.donahuenet.xyz
+        traefik.http.middlewares.dozzle-inflight.inflightreq.amount: '50'
+        traefik.http.routers.dozzle-rtr.middlewares: dozzle-ratelimit,dozzle-inflight
+        traefik.http.routers.dozzle-rtr.service: dozzle-svc
+        traefik.http.routers.dozzle-rtr.tls: 'true'
+        homepage.icon: dozzle.png
+        homepage.name: Dozzle
+        traefik.http.routers.dozzle-rtr.entrypoints: websecure
+        homepage.siteMonitor: http://dozzle:8080
+        homepage.description: Log Viewer
+        traefik.http.middlewares.dozzle-ratelimit.ratelimit.average: '100'
+        traefik.http.middlewares.dozzle-ratelimit.ratelimit.burst: '50'
+        traefik.enable: 'true'
+networks:
+  traefik-public:
+    external: true

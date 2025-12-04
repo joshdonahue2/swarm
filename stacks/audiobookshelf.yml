@@ -1,0 +1,43 @@
+version: '3.3'
+services:
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    environment:
+      AUDIOBOOKSHELF_GID: '1000'
+      AUDIOBOOKSHELF_UID: '1000'
+      TZ: ''
+    volumes:
+     - /mnt/data/media/books:/audiobooks
+     - /mnt/shared/swarm/audiobookshelf/podcasts:/podcasts
+     - /mnt/shared/swarm/audiobookshelf/audiodb/config:/config
+     - /mnt/shared/swarm/audiobookshelf/metadata:/metadata
+    networks:
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        homepage.group: Entertainment
+        traefik.http.routers.audiobookshelf.entrypoints: websecure
+        traefik.http.routers.audiobookshelf.middlewares: audiobookshelf-ratelimit,audiobookshelf-inflight
+        homepage.widget.url: http://audiobookshelf:80
+        homepage.widget.key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXlJZCI6ImU0NjYzNTk0LTA2OGQtNDAwNi05Yjc3LWU2YzAwZThmNzdlYyIsIm5hbWUiOiJob21lcGFnZSIsInR5cGUiOiJhcGkiLCJpYXQiOjE3NjQ2OTcxNjd9.tJnvtXqccCNt2bpmB9a3A1VRBvUTVBZDM5IYRPN365w
+        traefik.http.middlewares.audiobookshelf-inflight.inflightreq.amount: '50'
+        homepage.href: https://audio.donahuenet.xyz
+        traefik.http.middlewares.audiobookshelf-ratelimit.ratelimit.burst: '50'
+        homepage.icon: audiobookshelf.png
+        homepage.name: Audiobookshelf
+        traefik.http.routers.audiobookshelf.tls: 'true'
+        traefik.http.middlewares.audiobookshelf-ratelimit.ratelimit.average: '100'
+        traefik.http.routers.audiobookshelf.service: audiobookshelf-svc
+        homepage.siteMonitor: http://audiobookshelf:80
+        traefik.http.services.audiobookshelf-svc.loadbalancer.server.port: '80'
+        homepage.description: Audiobooks & Podcasts
+        homepage.widget.type: audiobookshelf
+        traefik.enable: 'true'
+        traefik.http.routers.audiobookshelf.rule: Host(`audio.donahuenet.xyz`)
+      restart_policy:
+        condition: on-failure
+networks:
+  traefik-public:
+    external: true

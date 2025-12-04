@@ -1,0 +1,81 @@
+version: '3.3'
+services:
+  bitmagnet:
+    image: ghcr.io/bitmagnet-io/bitmagnet:latest
+    command:
+     - worker
+     - run
+     - --keys=http_server
+     - --keys=queue_server
+     - --keys=dht_crawler
+    environment:
+      PGID: '1000'
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: postgres
+      PUID: '1000'
+      TMDB_API_KEY: a131fe85d13b90db73b6052bff015aa1
+    ports:
+     - 3334:3334
+     - 3334:3334/udp
+    volumes:
+     - /mnt/shared/swarm/bitmagnet/config:/root/.config/bitmagnet
+    networks:
+     - bitmagnet-internal
+     - traefik-public
+    configs:
+     -
+      source: bitmagnet_config
+      target: /root/.config/bitmagnet/config.yml
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        homepage.group: Download
+        traefik.http.routers.bitmagnet.entrypoints: websecure
+        homepage.href: https://bitmagnet.donahuenet.xyz
+        traefik.http.routers.bitmagnet.middlewares: bitmagnet-ratelimit,bitmagnet-inflight
+        traefik.http.routers.bitmagnet.service: bitmagnet-svc
+        traefik.http.middlewares.bitmagnet-ratelimit.ratelimit.average: '100'
+        homepage.icon: bitmagnet.png
+        traefik.http.services.bitmagnet-svc.loadbalancer.server.port: '3333'
+        traefik.http.middlewares.bitmagnet-inflight.inflightreq.amount: '50'
+        homepage.name: Bitmagnet
+        traefik.http.routers.bitmagnet.rule: Host(`bitmagnet.donahuenet.xyz`)
+        homepage.siteMonitor: http://bitmagnet:3333
+        traefik.http.middlewares.bitmagnet-ratelimit.ratelimit.burst: '50'
+        homepage.description: DHT Crawler & Indexer
+        traefik.http.routers.bitmagnet.tls: 'true'
+        traefik.docker.network: traefik-public
+        traefik.enable: 'true'
+      restart_policy:
+        condition: on-failure
+  postgres:
+    image: postgres:16-alpine
+    healthcheck:
+      test:
+       - CMD-SHELL
+       - pg_isready
+      interval: 10s
+      timeout: 5s
+    environment:
+      PGUSER: postgres
+      POSTGRES_DB: bitmagnet
+      POSTGRES_PASSWORD: postgres
+    volumes:
+     - /mnt/shared/swarm/bitmagnet/data/postgres:/var/lib/postgresql/data
+    networks:
+     - bitmagnet-internal
+    logging:
+      driver: json-file
+    deploy:
+      restart_policy:
+        condition: on-failure
+networks:
+  bitmagnet-internal:
+    driver: overlay
+    internal: true
+  traefik-public:
+    external: true
+configs:
+  bitmagnet_config:
+    external: true
