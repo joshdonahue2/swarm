@@ -5,7 +5,7 @@ x-nodel-config:
   port: 30000
   group: Media
   icon: luanti.png
-  replicas: 1
+  replicas: 0
 
 services:
   luanti:
