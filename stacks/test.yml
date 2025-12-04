@@ -1,0 +1,16 @@
+version: '3.8'
+
+# --- CONFIGURATION ---
+x-nodel-config:
+  url: test.donahuenet.xyz
+  port: 80
+  icon: docker.png
+  group: Services
+  replicas: 1
+
+services:
+  test:
+    image: nginx:alpine
+    restart: always
+    volumes:
+      - html:/user/share/nginx/html
