@@ -15,21 +15,22 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # --- REMOVED: setup-python step ---
-      # --- REMOVED: pip install step ---
+      # ---------------------------------------------------------
+      # REMOVED the "Install Python Dependencies" step entirely.
+      # We assume you ran the apt install command manually once.
+      # ---------------------------------------------------------
 
       - name: Process Stacks
-        # We use 'python3' directly, relying on the package we installed in Step 1
+        # We just use the python3 installed on the system
         run: python3 scripts/process_stacks.py
 
       - name: Deploy to Swarm
         run: |
           echo "🚀 Starting Deployment Loop..."
           
-          # Check if any files exist to prevent errors if folder is empty
           if [ -d "ready_to_deploy" ]; then
             for file in ready_to_deploy/*.yml; do
-              [ -e "$file" ] || continue # Handle case where glob matches nothing
+              [ -e "$file" ] || continue
               
               stack_name=$(basename "$file" .yml)
               
