@@ -1,36 +1,30 @@
-name: Deploy Stack to Swarm
+name: Deploy Stack Locally
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'docker-compose.prod.yml' # Only run if the PROD file changes
+      - 'docker-compose.prod.yml'
 
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
+  deploy_local:
+    # THIS is the magic change. It tells GitHub to use YOUR server, not theirs.
+    runs-on: self-hosted
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Copy Stack File to Server
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SWARM_HOST }}
-          username: ${{ secrets.SWARM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "docker-compose.prod.yml"
-          target: "/opt/stacks/my-repo"
-          # This will create the folder /opt/stacks/my-repo on your server
-
-      - name: Deploy Stack
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SWARM_HOST }}
-          username: ${{ secrets.SWARM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd /opt/stacks/my-repo
-            # Deploy the stack (Update 'main_stack' to whatever you want to call your stack in Swarmpit)
-            docker stack deploy -c docker-compose.prod.yml main_stack
+      - name: Deploy to Swarm
+        run: |
+          # We are already on the server!
+          # The code is checked out to the runner's work directory.
+          
+          echo "Deploying from local runner..."
+          
+          # Deploy directly using the file in the current workspace
+          docker stack deploy -c docker-compose.prod.yml main_stack
+          
+          # Optional: Prune old unused images to save space on your local drive
+          docker system prune -f
