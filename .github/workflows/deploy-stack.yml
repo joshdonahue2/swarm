@@ -1,0 +1,61 @@
+name: Deploy Stack on Change
+
+on:
+  push:
+    paths:
+      - 'stacks/**.yml'
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Python Dependencies
+        run: pip3 install pyyaml
+
+      - name: Detect Changed Files and Deploy
+        run: |
+          # Find changed files in 'stacks/'
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^stacks/.*\.yml$')
+          
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No stack files changed."
+            exit 0
+          fi
+
+          for FILE in $CHANGED_FILES; do
+            echo "Processing $FILE..."
+            STACK_NAME=$(basename "$FILE" .yml)
+            
+            # 1. Run the standardize script
+            python3 scripts/standardize.py "$FILE" > deploy_generated.yml
+            
+            # 2. AUTO-CREATE FOLDERS
+            # We look for the service name in the generic file to create the folder.
+            # This loops through services in the file to create /mnt/shared/swarm/<service>
+            # It creates the dir if it doesn't exist, and forces ownership to 1000:1000
+            
+            # Extract service names using yq or simple grep/python. 
+            # Since we have python, let's use a quick inline script for robust parsing:
+            python3 -c "
+import yaml
+with open('$FILE') as f:
+    d = yaml.safe_load(f)
+    for s in d.get('services', {}):
+        print(s.lower().replace(' ', ''))
+            " | while read SERVICE_SLUG; do
+                TARGET_DIR="/mnt/shared/swarm/$SERVICE_SLUG"
+                echo "Ensuring directory exists: $TARGET_DIR"
+                sudo mkdir -p "$TARGET_DIR"
+                sudo chown -R 1000:1000 "$TARGET_DIR"
+            done
+
+            # 3. Deploy
+            echo "Deploying stack: $STACK_NAME"
+            docker stack deploy -c deploy_generated.yml "$STACK_NAME"
+            
+            # Cleanup
+            rm deploy_generated.yml
+          done
