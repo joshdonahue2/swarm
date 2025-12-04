@@ -1,11 +1,10 @@
 version: "3.8"
 
-# --- THE FORM ---
 x-nodel-config:
   url: app.donahuenet.xyz
   port: 32400
   group: Media
   icon: plex.png
-# ----------------
+  replicas: 1
 
 services:

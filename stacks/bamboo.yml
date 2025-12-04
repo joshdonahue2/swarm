@@ -6,7 +6,7 @@ x-nodel-config:
   port: 3000
   group: Services
   icon: bambu.png
-# ----------------
+  replicas: 0
 
 services:
   bambustudio:

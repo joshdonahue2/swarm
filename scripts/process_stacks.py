@@ -7,11 +7,11 @@ import shutil
 INPUT_FOLDER = "stacks"
 OUTPUT_FOLDER = "ready_to_deploy"
 TRAEFIK_NETWORK = "traefik-public"
-BASE_STORAGE_PATH = "/mnt/shared/swarm" # <--- defined your storage root
+BASE_STORAGE_PATH = "/mnt/shared/swarm"
 
 def process_file(filepath):
     filename = os.path.basename(filepath)
-    stack_name = filename.replace('.yml', '') # Get "bambustudio" from "bambustudio.yml"
+    stack_name = filename.replace('.yml', '')
     print(f"🔹 Processing: {filename}...")
 
     with open(filepath, 'r') as f:
@@ -31,7 +31,7 @@ def process_file(filepath):
         return
 
     # --- AUTO-GENERATION MODE ---
-    print(f"   ✨ Auto-generating labels, volumes, and cleaning ports...")
+    print(f"   ✨ Auto-generating labels, volumes, replicas, and cleaning ports...")
     config = data.get('x-nodel-config', {})
     
     if 'services' in data and len(data['services']) > 0:
@@ -42,51 +42,45 @@ def process_file(filepath):
         port = config.get('port', 80)
         icon = config.get('icon', 'docker.png')
         group = config.get('group', 'My Apps')
+        
+        # NEW: Get Replicas (Default to 1 if missing)
+        replicas = config.get('replicas', 1)
 
-        # 1. REMOVE PORTS (Security)
-        # We remove ports because Traefik proxies to the container internally.
+        # 1. APPLY REPLICAS (Turn off/Scale up)
+        if 'deploy' not in service: service['deploy'] = {}
+        service['deploy']['replicas'] = int(replicas)
+        print(f"   ⚙️  Replicas set to: {replicas}")
+
+        # 2. REMOVE PORTS (Security)
         if 'ports' in service:
             print(f"   🛡️  Removing exposed ports from {first_service_name} (GitOps standard)")
             del service['ports']
 
-        # 2. STANDARDIZE VOLUMES & CREATE FOLDERS
+        # 3. STANDARDIZE VOLUMES & CREATE FOLDERS
         if 'volumes' in service:
             new_volumes = []
             for vol in service['volumes']:
-                # Vol formats: "host_path:container_path" or just "container_path" (rare)
                 parts = vol.split(':')
-                
                 if len(parts) >= 2:
                     host_part = parts[0]
                     container_part = parts[1]
                     
-                    # Logic: If it starts with '/', it's an absolute path (like /etc/localtime). Keep it.
-                    # If it doesn't (like 'config'), it's a relative/named volume. Convert it.
                     if host_part.startswith('/'):
                         new_volumes.append(vol)
                     else:
-                        # Construct the standardized path
-                        # e.g. /mnt/shared/swarm/bambustudio/config
                         full_host_path = os.path.join(BASE_STORAGE_PATH, stack_name, host_part)
-                        
-                        # CREATE THE DIRECTORY ON THE SERVER
                         try:
                             os.makedirs(full_host_path, exist_ok=True)
                             print(f"   wd  Ensured directory exists: {full_host_path}")
                         except OSError as e:
                             print(f"   ⚠️  Warning: Could not create folder {full_host_path}. Permission issue? {e}")
 
-                        # Add the new string to the list
                         new_volumes.append(f"{full_host_path}:{container_part}")
-            
-            # Apply the updated list
             service['volumes'] = new_volumes
 
-        # 3. APPLY LABELS (Traefik + Homepage)
+        # 4. APPLY LABELS (Traefik + Homepage)
         if url:
-            if 'deploy' not in service: service['deploy'] = {}
             if 'labels' not in service['deploy']: service['deploy']['labels'] = []
-            
             labels = service['deploy']['labels']
             
             new_labels = [
