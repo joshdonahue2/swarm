@@ -5,42 +5,41 @@ on:
     paths:
       - 'stacks/**'
       - 'scripts/**'
+      - '.github/workflows/**'
 
 jobs:
   deploy:
-    runs-on: self-hosted  # Assuming you are using the local runner from previous steps
+    runs-on: self-hosted
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-
-      - name: Install Dependencies
-        run: pip install pyyaml
+      # --- REMOVED: setup-python step ---
+      # --- REMOVED: pip install step ---
 
       - name: Process Stacks
-        run: python scripts/process_stacks.py
-        # This reads stacks/*.yml and saves them to ready_to_deploy/*.yml
+        # We use 'python3' directly, relying on the package we installed in Step 1
+        run: python3 scripts/process_stacks.py
 
       - name: Deploy to Swarm
         run: |
           echo "🚀 Starting Deployment Loop..."
           
-          # Loop through every file in the output folder
-          for file in ready_to_deploy/*.yml; do
-            # Extract filename without extension (e.g., 'plex.yml' -> 'plex')
-            stack_name=$(basename "$file" .yml)
-            
-            echo "---------------------------------"
-            echo "🐳 Deploying Stack: $stack_name"
-            
-            # Deploy using the generated file
-            docker stack deploy -c "$file" "$stack_name" --prune
-            
-          done
+          # Check if any files exist to prevent errors if folder is empty
+          if [ -d "ready_to_deploy" ]; then
+            for file in ready_to_deploy/*.yml; do
+              [ -e "$file" ] || continue # Handle case where glob matches nothing
+              
+              stack_name=$(basename "$file" .yml)
+              
+              echo "---------------------------------"
+              echo "🐳 Deploying Stack: $stack_name"
+              
+              docker stack deploy -c "$file" "$stack_name" --prune
+            done
+          else
+            echo "⚠️ No stacks found to deploy."
+          fi
           
           echo "✅ All stacks updated!"
