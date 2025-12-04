@@ -1,0 +1,46 @@
+version: '3.3'
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    environment:
+      ADMIN_TOKEN: YwxXFZktjq43O+bNYWTUYnAh5omN5QtGU1Tl9HpK/P39LS+HE3yspdZGGMiKBIlf
+      DOMAIN: https://vault.donahuenet.xyz
+      SIGNUPS_ALLOWED: 'true'
+      SMTP_FROM: josh@donahuenet.xyz
+      SMTP_HOST: smtp-relay.donahuenet.xyz
+      SMTP_PASSWORD: sendinblue password
+      SMTP_PORT: '587'
+      SMTP_USERNAME: user@example.com
+      TZ: ''
+      WEBSOCKET_ENABLED: 'true'
+    ports:
+     - 9445:80
+    volumes:
+     - /mnt/shared/swarm/bitwarden:/data
+    networks:
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        traefik.http.middlewares.vaultwarden-ratelimit.ratelimit.average: '100'
+        homepage.group: Services
+        traefik.http.routers.vaultwarden-rtr.service: vaultwarden-svc
+        homepage.href: https://vault.donahuenet.xyz
+        traefik.http.routers.vaultwarden-rtr.entrypoints: websecure
+        traefik.http.middlewares.vaultwarden-ratelimit.ratelimit.burst: '50'
+        homepage.icon: vaultwarden.png
+        traefik.http.routers.vaultwarden-rtr.tls: 'true'
+        homepage.name: Vaultwarden
+        homepage.siteMonitor: http://vaultwarden:80
+        homepage.description: Password Manager
+        traefik.http.routers.vaultwarden-rtr.rule: Host(`vault.donahuenet.xyz`)
+        traefik.http.services.vaultwarden-svc.loadbalancer.server.port: '80'
+        traefik.http.middlewares.vaultwarden-inflight.inflightreq.amount: '50'
+        traefik.enable: 'true'
+        traefik.http.routers.vaultwarden-rtr.middlewares: vaultwarden-ratelimit,vaultwarden-inflight
+      restart_policy:
+        max_attempts: 3
+networks:
+  traefik-public:
+    external: true

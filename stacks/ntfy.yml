@@ -1,0 +1,47 @@
+version: '3.3'
+services:
+  ntfy:
+    image: binwiederhier/ntfy:latest
+    command:
+     - serve
+    environment:
+      NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
+      NTFY_BASE_URL: http://ntfy.donahuenet.xyz
+      NTFY_BEHIND_PROXY: 'true'
+      NTFY_ENABLE_LOGIN: 'true'
+      TZ: '"America/Indiana/Indianapolis"'
+    ports:
+     - 8150:80
+    volumes:
+     - /mnt/shared/swarm/ntfy/cache:/var/cache/ntfy
+     - /mnt/shared/swarm/ntfy:/etc/ntfy
+     - /mnt/shared/swarm/ntfy/cache.db:/var/lib/ntfy/cache.db
+     - /mnt/shared/swarm/ntfy/auth.db:/var/lib/ntfy/auth.db
+     - /mnt/shared/swarm/ntfy/attachments:/var/lib/ntfy/attachments
+    networks:
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        homepage.group: Services
+        traefik.http.routers.ntfy-rtr.middlewares: ntfy-ratelimit,ntfy-inflight
+        traefik.http.routers.ntfy-rtr.rule: Host(`ntfy.donahuenet.xyz`)
+        traefik.http.middlewares.ntfy-ratelimit.ratelimit.average: '100'
+        traefik.http.services.ntfy-svc.loadbalancer.server.port: '80'
+        homepage.href: https://ntfy.donahuenet.xyz
+        traefik.http.routers.ntfy-rtr.service: ntfy-svc
+        homepage.icon: ntfy.png
+        homepage.name: Ntfy
+        traefik.http.routers.ntfy-rtr.entrypoints: websecure
+        homepage.siteMonitor: http://ntfy:80
+        traefik.http.middlewares.ntfy-ratelimit.ratelimit.burst: '50'
+        homepage.description: Push Notifications
+        traefik.http.routers.ntfy-rtr.tls: 'true'
+        traefik.enable: 'true'
+        traefik.http.middlewares.ntfy-inflight.inflightreq.amount: '50'
+      restart_policy:
+        condition: on-failure
+networks:
+  traefik-public:
+    external: true

@@ -1,0 +1,46 @@
+version: '3.3'
+services:
+  searx:
+    image: searxng/searxng:latest
+    healthcheck:
+      test:
+       - CMD
+       - wget
+       - -q
+       - --spider
+       - --proxy=off
+       - http://localhost:8080/healthz
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    ports:
+     - 7654:8080
+    volumes:
+     - /mnt/shared/swarm/searx-data:/etc/searxng
+    networks:
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        homepage.group: Services
+        homepage.href: https://searx.donahuenet.xyz
+        traefik.http.middlewares.searx-ratelimit.ratelimit.average: '100'
+        traefik.http.services.searx-svc.loadbalancer.server.port: '8080'
+        traefik.http.middlewares.searx-inflight.inflightreq.amount: '50'
+        traefik.http.routers.searx.tls: 'true'
+        homepage.icon: searxng.png
+        homepage.name: SearXNG
+        traefik.http.routers.searx.middlewares: searx-ratelimit,searx-inflight
+        homepage.siteMonitor: http://searx:8080
+        traefik.http.routers.searx.service: searx-svc
+        traefik.http.routers.searx.rule: Host(`searx.donahuenet.xyz`)
+        homepage.description: Private Search Engine
+        traefik.http.middlewares.searx-ratelimit.ratelimit.burst: '50'
+        traefik.http.routers.searx.entrypoints: websecure
+        traefik.enable: 'true'
+      restart_policy:
+        condition: on-failure
+networks:
+  traefik-public:
+    external: true

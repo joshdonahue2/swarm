@@ -1,0 +1,54 @@
+version: '3.3'
+services:
+  traefik-swarm:
+    image: traefik:v3
+    environment:
+      CF_DNS_API_TOKEN: NNSNiZsfY8eSCUxaHxiloaTuAwq8V1jdUfOhahER
+    ports:
+     - 80:80
+     - 443:443
+     - 8085:8080
+    volumes:
+     - /var/run/docker.sock:/var/run/docker.sock:ro
+     - /home/josh/docker/traefik/rules/:/rules/:ro
+     - /home/josh/docker/traefik/letsencrypt/acme.json:/acme.json
+     - /home/josh/docker/traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+    networks:
+     - traefik-public
+    logging:
+      driver: json-file
+      options:
+        max-file: '3'
+        max-size: 10m
+    deploy:
+      mode: global
+      labels:
+        homepage.group: Services
+        traefik.http.middlewares.traefik-inflight.inflightreq.amount: '50'
+        traefik.http.routers.api.entrypoints: websecure
+        homepage.widget.url: http://traefik-swarm:8080
+        traefik.http.middlewares.traefik-ratelimit.ratelimit.burst: '50'
+        traefik.http.routers.api.rule: Host(`traefik.donahuenet.xyz`)
+        homepage.widget.username: admin
+        homepage.href: https://traefik.donahuenet.xyz
+        traefik.http.routers.api.tls: 'true'
+        homepage.icon: traefik.png
+        traefik.http.routers.api.middlewares: traefik-ratelimit,traefik-inflight
+        homepage.name: Traefik
+        traefik.http.middlewares.traefik-ratelimit.ratelimit.average: '100'
+        homepage.widget.password: Daisy54
+        homepage.siteMonitor: https://traefik.donahuenet.xyz
+        homepage.description: Edge Router
+        traefik.http.routers.api.service: api@internal
+        homepage.widget.type: traefik
+        traefik.enable: 'true'
+      update_config:
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+         - node.role == manager
+networks:
+  traefik-public:
+    external: true

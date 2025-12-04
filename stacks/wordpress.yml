@@ -1,0 +1,67 @@
+version: '3.3'
+services:
+  db:
+    image: mariadb:latest
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_PASSWORD: word
+      MARIADB_ROOT_PASSWORD: mysecretrootpassword
+      MARIADB_USER: word
+    volumes:
+     - /mnt/shared/swarm/wordpress/db:/var/lib/mysql
+    networks:
+     - internal
+    logging:
+      driver: json-file
+    deploy:
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+         - node.role == worker
+
+  wordpress:
+    image: wordpress:latest
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_PASSWORD: word
+      WORDPRESS_DB_USER: word
+    volumes:
+     - /mnt/shared/swarm/wordpress/wordpress:/var/www/html
+    networks:
+     - traefik-public
+     - internal
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        # Traefik Labels
+        traefik.http.middlewares.wordpress-ratelimit.ratelimit.average: '100'
+        traefik.http.routers.wordpress-rtr.rule: Host(`wordpress.donahuenet.xyz`)
+        traefik.http.routers.wordpress-rtr.entrypoints: websecure
+        traefik.http.middlewares.wordpress-inflight.inflightreq.amount: '50'
+        traefik.http.middlewares.wordpress-ratelimit.ratelimit.burst: '50'
+        traefik.http.routers.wordpress-rtr.middlewares: wordpress-ratelimit,wordpress-inflight
+        traefik.http.services.wordpress-svc.loadbalancer.server.port: '80'
+        traefik.http.routers.wordpress-rtr.tls: 'true'
+        traefik.enable: 'true'
+        traefik.http.routers.wordpress-rtr.service: wordpress-svc
+        # Homepage Labels
+        homepage.group: Services
+        homepage.name: WordPress
+        homepage.icon: wordpress.png
+        homepage.href: https://wordpress.donahuenet.xyz
+        homepage.description: Blog & Website
+        homepage.siteMonitor: https://wordpress.donahuenet.xyz
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+         - node.role == worker
+
+networks:
+  internal:
+    driver: overlay
+  traefik-public:
+    external: true

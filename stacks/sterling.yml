@@ -1,0 +1,40 @@
+version: '3.3'
+services:
+  stirling-pdf:
+    image: docker.stirlingpdf.com/stirlingtools/stirling-pdf:latest
+    environment:
+      DISABLE_ADDITIONAL_FEATURES: 'false'
+      LANGS: en_GB
+    volumes:
+     - /mnt/shared/swarm/stirling-pdf/trainingData:/usr/share/tessdata
+     - /mnt/shared/swarm/stirling-pdf/extraConfigs:/configs
+     - /mnt/shared/swarm/stirling-pdf/customFiles:/customFiles/
+     - /mnt/shared/swarm/stirling-pdf/logs:/logs/
+     - /mnt/shared/swarm/stirling-pdf/pipeline:/pipeline/
+    networks:
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        homepage.group: Services
+        traefik.http.middlewares.stirling-pdf-inflight.inflightreq.amount: '50'
+        traefik.http.routers.stirling-pdf.middlewares: stirling-pdf-ratelimit,stirling-pdf-inflight
+        homepage.href: https://pdf.donahuenet.xyz
+        traefik.http.services.stirling-pdf-svc.loadbalancer.server.port: '8080'
+        traefik.http.middlewares.stirling-pdf-ratelimit.ratelimit.burst: '50'
+        traefik.http.routers.stirling-pdf.service: stirling-pdf-svc
+        traefik.http.routers.stirling-pdf.rule: Host(`pdf.donahuenet.xyz`)
+        traefik.http.middlewares.stirling-pdf-ratelimit.ratelimit.average: '100'
+        homepage.icon: stirling-pdf.png
+        traefik.http.routers.stirling-pdf.tls: 'true'
+        homepage.name: Stirling PDF
+        traefik.http.routers.stirling-pdf.entrypoints: websecure
+        homepage.siteMonitor: https://pdf.donahuenet.xyz
+        homepage.description: PDF Manipulation Tools
+        traefik.enable: 'true'
+      restart_policy:
+        condition: on-failure
+networks:
+  traefik-public:
+    external: true

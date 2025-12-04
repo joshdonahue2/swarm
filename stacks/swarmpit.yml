@@ -1,0 +1,111 @@
+version: '3.3'
+services:
+  agent:
+    image: swarmpit/agent:latest
+    environment:
+      DOCKER_API_VERSION: '1.35'
+    volumes:
+     - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+     - net
+    logging:
+      driver: json-file
+    deploy:
+      mode: global
+      labels:
+        swarmpit.agent: 'true'
+      resources:
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+        limits:
+          cpus: '0.1'
+          memory: 64M
+  app:
+    image: swarmpit/swarmpit:latest
+    healthcheck:
+      test:
+       - CMD
+       - curl
+       - -f
+       - http://localhost:8080
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    environment:
+      SWARMPIT_DB: http://db:5984
+      SWARMPIT_INFLUXDB: http://influxdb:8086
+    ports:
+     - 888:8080
+    volumes:
+     - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+     - net
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        traefik.http.middlewares.swarm-ratelimit.ratelimit.burst: '50'
+        homepage.group: Servers
+        traefik.http.routers.swarm.tls: 'true'
+        traefik.http.routers.swarm.rule: Host(`swarm.donahuenet.xyz`)
+        traefik.http.routers.swarm.entrypoints: websecure
+        homepage.href: https://swarm.donahuenet.xyz
+        traefik.http.middlewares.swarm-ratelimit.ratelimit.average: '100'
+        traefik.http.routers.swarm.service: swarm-svc
+        homepage.icon: swarmpit.png
+        traefik.http.services.swarm-svc.loadbalancer.server.port: '8080'
+        homepage.name: Swarmpit
+        homepage.siteMonitor: http://app:8080
+        homepage.description: Cluster Management
+        traefik.http.middlewares.swarm-inflight.inflightreq.amount: '50'
+        traefik.enable: 'true'
+        traefik.http.routers.swarm.middlewares: swarm-ratelimit,swarm-inflight
+      placement:
+        constraints:
+         - node.role == manager
+      resources:
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+        limits:
+          cpus: '0.5'
+          memory: 1024M
+  db:
+    image: couchdb:2.3.0
+    volumes:
+     - /mnt/shared/swarm/swarmpit/data/db-data:/opt/couchdb/data
+    networks:
+     - net
+    logging:
+      driver: json-file
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.15'
+          memory: 128M
+        limits:
+          cpus: '0.3'
+          memory: 256M
+  influxdb:
+    image: influxdb:1.8
+    volumes:
+     - /mnt/shared/swarm/swarmpit/data/influx-data:/var/lib/influxdb
+    networks:
+     - net
+    logging:
+      driver: json-file
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.3'
+          memory: 128M
+        limits:
+          cpus: '0.6'
+          memory: 512M
+networks:
+  net:
+    driver: overlay
+  traefik-public:
+    external: true
