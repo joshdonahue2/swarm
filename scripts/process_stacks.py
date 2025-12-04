@@ -1,6 +1,7 @@
 import yaml
 import os
 import glob
+import shutil
 
 # CONFIGURATION
 INPUT_FOLDER = "stacks"
@@ -18,19 +19,28 @@ def process_file(filepath):
             print(f"❌ Error reading {filename}: {e}")
             return
 
-    # Ensure basics exist
-    if 'networks' not in data: data['networks'] = {}
-    
-    # 1. READ CONFIG (The "Form" Answers)
-    # We look for 'x-nodel-config' at the top of the file
+    # --- MODE CHECK ---
+    # If no x-nodel-config, we treat this as a "Raw" file (Power User Mode)
+    if 'x-nodel-config' not in data:
+        print(f"   ℹ️  No auto-config found. Deploying in 'Raw Mode' (Preserving your custom labels).")
+        
+        # Just ensure the network exists, then save and exit
+        if 'networks' not in data: data['networks'] = {}
+        if TRAEFIK_NETWORK not in data['networks']:
+            data['networks'][TRAEFIK_NETWORK] = {'external': True}
+            
+        output_path = os.path.join(OUTPUT_FOLDER, filename)
+        with open(output_path, 'w') as f:
+            yaml.dump(data, f, sort_keys=False)
+        return
+
+    # --- AUTO-GENERATION MODE ---
+    # This runs ONLY if x-nodel-config IS present
+    print(f"   ✨ Auto-generating labels...")
     config = data.get('x-nodel-config', {})
     
-    # If no config is present, we just save the file as-is and exit
-    if not config:
-        print(f"   ℹ️  No x-nodel-config found. Deploying as plain compose.")
-    else:
-        # 2. INJECT LABELS
-        # We assume the first service listed is the "Main" one to label
+    # We look for the first service to apply labels to
+    if 'services' in data and len(data['services']) > 0:
         first_service_name = list(data['services'].keys())[0]
         service = data['services'][first_service_name]
 
@@ -40,14 +50,12 @@ def process_file(filepath):
         group = config.get('group', 'My Apps')
 
         if url:
-            print(f"   ✨ Injecting Traefik & Homepage for: {url}")
-            
-            # Ensure deploy/labels structure
             if 'deploy' not in service: service['deploy'] = {}
             if 'labels' not in service['deploy']: service['deploy']['labels'] = []
             
             labels = service['deploy']['labels']
             
+            # Standard Labels
             new_labels = [
                 "traefik.enable=true",
                 f"traefik.docker.network={TRAEFIK_NETWORK}",
@@ -61,16 +69,11 @@ def process_file(filepath):
                 f"homepage.href=https://{url}"
             ]
             
-            # Add unique labels
             for l in new_labels:
                 if l not in labels: labels.append(l)
 
-            # Ensure Network
-            if TRAEFIK_NETWORK not in data['networks']:
-                data['networks'][TRAEFIK_NETWORK] = {'external': True}
-            
+            # Add Network
             if 'networks' not in service: service['networks'] = []
-            # Handle list vs dict network format
             if isinstance(service['networks'], list):
                 if TRAEFIK_NETWORK not in service['networks']:
                     service['networks'].append(TRAEFIK_NETWORK)
@@ -78,22 +81,23 @@ def process_file(filepath):
                  if TRAEFIK_NETWORK not in service['networks']:
                     service['networks'][TRAEFIK_NETWORK] = {}
 
-    # 3. CLEANUP
-    # Remove the x-nodel-config so Docker doesn't complain (though it usually ignores x-)
-    if 'x-nodel-config' in data:
-        del data['x-nodel-config']
+    # Cleanup Config
+    del data['x-nodel-config']
 
-    # 4. SAVE
+    # Ensure global network exists
+    if 'networks' not in data: data['networks'] = {}
+    if TRAEFIK_NETWORK not in data['networks']:
+        data['networks'][TRAEFIK_NETWORK] = {'external': True}
+
+    # Save
     output_path = os.path.join(OUTPUT_FOLDER, filename)
     with open(output_path, 'w') as f:
         yaml.dump(data, f, sort_keys=False)
 
 def main():
-    # Create output folder
     if not os.path.exists(OUTPUT_FOLDER):
         os.makedirs(OUTPUT_FOLDER)
 
-    # Loop through all .yml files in stacks/
     files = glob.glob(os.path.join(INPUT_FOLDER, "*.yml"))
     for f in files:
         process_file(f)
