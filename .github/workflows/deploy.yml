@@ -1,0 +1,30 @@
+name: Deploy Stack Locally
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docker-compose.prod.yml'
+
+jobs:
+  deploy_local:
+    # THIS is the magic change. It tells GitHub to use YOUR server, not theirs.
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Deploy to Swarm
+        run: |
+          # We are already on the server!
+          # The code is checked out to the runner's work directory.
+          
+          echo "Deploying from local runner..."
+          
+          # Deploy directly using the file in the current workspace
+          docker stack deploy -c docker-compose.prod.yml main_stack
+          
+          # Optional: Prune old unused images to save space on your local drive
+          docker system prune -f
