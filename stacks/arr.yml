@@ -1,0 +1,205 @@
+version: '3.3'
+services:
+  overseerr:
+    image: ghcr.io/hotio/overseerr:latest
+    environment:
+      PGID: '1000'
+      PUID: '1000'
+      TZ: America/Indiana/Indianapolis
+    ports:
+     - 5055:5055
+    volumes:
+     - /etc/localtime:/etc/localtime:ro
+     - /mnt/shared/swarm/overseerr:/config
+     - /mnt/data:/data
+    networks:
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        homepage.group: Download
+        traefik.http.routers.overseer.service: overseer-svc
+        traefik.http.middlewares.overseer-ratelimit.ratelimit.burst: '50'
+        homepage.widget.url: http://overseerr:5055
+        traefik.http.routers.overseer.entrypoints: websecure
+        homepage.widget.key: MTcyMzM4NTY1MjE5MzM5NGNlNDM5LTdiYzQtNDEwOS04NjZkLWUxYmFmNjZkYjU4MQ==
+        homepage.href: https://seer.donahuenet.xyz
+        traefik.http.routers.overseer.middlewares: overseer-ratelimit,overseer-inflight
+        homepage.icon: overseerr.png
+        homepage.name: Overseerr
+        traefik.http.routers.overseer.rule: Host(`seer.donahuenet.xyz`)
+        traefik.http.services.overseer-svc.loadbalancer.server.port: '5055'
+        homepage.siteMonitor: http://overseerr:5055
+        homepage.description: Media Requests
+        traefik.http.middlewares.overseer-ratelimit.ratelimit.average: '100'
+        homepage.widget.type: overseerr
+        traefik.enable: 'true'
+        traefik.http.middlewares.overseer-inflight.inflightreq.amount: '50'
+      restart_policy:
+        condition: on-failure
+  prowlarr:
+    image: ghcr.io/hotio/prowlarr:latest
+    environment:
+      PGID: '1000'
+      PUID: '1000'
+      TZ: America/Indiana/Indianapolis
+    ports:
+     - 9696:9696
+    volumes:
+     - /etc/localtime:/etc/localtime:ro
+     - /mnt/shared/swarm/prowlarr:/config
+     - /mnt/data:/data
+    networks:
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        homepage.group: Download
+        traefik.http.routers.prowlar.middlewares: prowlar-ratelimit,prowlar-inflight
+        homepage.widget.url: http://prowlarr:9696
+        homepage.widget.key: bfe788cd73374ba68bd53bab041d4ee2
+        traefik.http.services.prowlar-svc.loadbalancer.server.port: '9696'
+        homepage.href: https://prowlar.donahuenet.xyz
+        traefik.http.middlewares.prowlar-inflight.inflightreq.amount: '50'
+        traefik.http.routers.prowlar.entrypoints: websecure
+        traefik.http.middlewares.prowlar-ratelimit.ratelimit.average: '100'
+        homepage.icon: prowlarr.png
+        homepage.name: Prowlarr
+        traefik.http.middlewares.prowlar-ratelimit.ratelimit.burst: '50'
+        traefik.http.routers.prowlar.service: prowlar-svc
+        homepage.siteMonitor: http://prowlarr:9696
+        traefik.http.routers.prowlar.rule: Host(`prowlar.donahuenet.xyz`)
+        homepage.description: Indexer Manager
+        traefik.http.routers.prowlar.tls: 'true'
+        homepage.widget.type: prowlarr
+        traefik.enable: 'true'
+      restart_policy:
+        condition: on-failure
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    environment:
+      PGID: '1000'
+      PUID: '1000'
+      TORRENTING_PORT: '6881'
+      TZ: America/Indiana/Indianapolis
+      WEBUI_PORT: '8080'
+    ports:
+     - 6881:6881
+     - 6881:6881/udp
+     - 8080:8080
+    volumes:
+     - /mnt/shared/swarm/qbittorrent/config:/config
+     - /mnt/data/torrents:/data/torrents
+    networks:
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        traefik.http.routers.qbit.middlewares: qbit-ratelimit,qbit-inflight
+        traefik.http.routers.qbit.service: qbit-svc
+        homepage.group: Download
+        traefik.udp.services.qbit-udp-6881.loadbalancer.server.port: '6881'
+        traefik.http.services.qbit-svc.loadbalancer.server.port: '8080'
+        traefik.http.routers.qbit.rule: Host(`qbit.donahuenet.xyz`)
+        homepage.widget.url: http://qbittorrent:8080
+        traefik.tcp.services.qbit-tcp-6881.loadbalancer.server.port: '6881'
+        homepage.widget.username: admin
+        traefik.http.middlewares.qbit-ratelimit.ratelimit.average: '100'
+        homepage.href: https://qbit.donahuenet.xyz
+        traefik.http.routers.qbit.tls: 'true'
+        traefik.http.middlewares.qbit-ratelimit.ratelimit.burst: '50'
+        homepage.icon: qbittorrent.png
+        traefik.http.middlewares.qbit-inflight.inflightreq.amount: '50'
+        homepage.name: qBittorrent
+        homepage.widget.password: Daisy54!
+        homepage.siteMonitor: http://qbittorrent:8080
+        homepage.description: Torrent Client
+        homepage.widget.type: qbittorrent
+        traefik.enable: 'true'
+        traefik.http.routers.qbit.entrypoints: websecure
+      restart_policy:
+        condition: on-failure
+  radarr:
+    image: ghcr.io/hotio/radarr:latest
+    environment:
+      PGID: '1000'
+      PUID: '1000'
+      TZ: America/Indiana/Indianapolis
+    ports:
+     - 7878:7878
+    volumes:
+     - /etc/localtime:/etc/localtime:ro
+     - /mnt/shared/swarm/radarr:/config
+     - /mnt/data:/data
+    networks:
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        traefik.http.middlewares.radar-ratelimit.ratelimit.burst: '50'
+        homepage.group: Download
+        traefik.http.routers.radar.service: radar-svc
+        traefik.http.routers.radar.entrypoints: websecure
+        homepage.widget.url: http://radarr:7878
+        homepage.widget.key: 59fd003e1892439495fde635c6243a54
+        traefik.http.middlewares.radar-inflight.inflightreq.amount: '50'
+        homepage.href: https://radar.donahuenet.xyz
+        traefik.http.routers.radar.tls: 'true'
+        traefik.http.routers.radar.middlewares: radar-ratelimit,radar-inflight
+        homepage.icon: radarr.png
+        homepage.name: Radarr
+        traefik.http.routers.radar.rule: Host(`radar.donahuenet.xyz`)
+        homepage.siteMonitor: http://radarr:7878
+        homepage.description: Movie Manager
+        homepage.widget.type: radarr
+        traefik.http.middlewares.radar-ratelimit.ratelimit.average: '100'
+        traefik.enable: 'true'
+        traefik.http.services.radar-svc.loadbalancer.server.port: '7878'
+      restart_policy:
+        condition: on-failure
+  sonarr:
+    image: ghcr.io/hotio/sonarr:latest
+    environment:
+      PGID: '1000'
+      PUID: '1000'
+      TZ: America/Indiana/Indianapolis
+    ports:
+     - 8989:8989
+    volumes:
+     - /etc/localtime:/etc/localtime:ro
+     - /mnt/shared/swarm/sonarr:/config
+     - /mnt/data:/data
+    networks:
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        homepage.group: Download
+        traefik.http.routers.sonar.tls: 'true'
+        traefik.http.routers.sonar.rule: Host(`sonar.donahuenet.xyz`)
+        traefik.http.middlewares.sonar-ratelimit.ratelimit.average: '100'
+        homepage.widget.url: http://sonarr:8989
+        homepage.widget.key: e2c7c780956b4a7ba71b4bc478ebf0ff
+        homepage.href: https://sonar.donahuenet.xyz
+        traefik.http.routers.sonar.middlewares: sonar-ratelimit,sonar-inflight
+        traefik.http.middlewares.sonar-inflight.inflightreq.amount: '50'
+        homepage.icon: sonarr.png
+        traefik.http.routers.sonar.service: sonar-svc
+        homepage.name: Sonarr
+        traefik.http.middlewares.sonar-ratelimit.ratelimit.burst: '50'
+        homepage.siteMonitor: http://sonarr:8989
+        homepage.description: Series Manager
+        traefik.http.services.sonar-svc.loadbalancer.server.port: '8989'
+        homepage.widget.type: sonarr
+        traefik.enable: 'true'
+        traefik.http.routers.sonar.entrypoints: websecure
+      restart_policy:
+        condition: on-failure
+networks:
+  traefik-public:
+    external: true
