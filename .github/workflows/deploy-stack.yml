@@ -13,7 +13,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # CHANGED: Use apt instead of pip for Debian 12 compatibility
       - name: Install Python Dependencies
         run: |
           sudo apt-get update
@@ -21,7 +20,26 @@ jobs:
 
       - name: Detect Changed Files and Deploy
         run: |
-          # Find changed files in 'stacks/'
+          # 1. Create a temporary Python script to extract service names
+          # We do this here to avoid YAML syntax issues with inline code
+          cat <<EOF > extract_services.py
+          import yaml
+          import sys
+          
+          try:
+              with open(sys.argv[1], 'r') as f:
+                  data = yaml.safe_load(f)
+              
+              if data and 'services' in data:
+                  for s in data['services']:
+                      # Clean the name to match folder structure
+                      print(s.lower().replace(' ', ''))
+          except Exception as e:
+              # Silently fail or log if file is invalid, loop will just handle nothing
+              pass
+          EOF
+
+          # 2. Find changed files
           CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep '^stacks/.*\.yml$')
           
           if [ -z "$CHANGED_FILES" ]; then
@@ -33,28 +51,25 @@ jobs:
             echo "Processing $FILE..."
             STACK_NAME=$(basename "$FILE" .yml)
             
-            # 1. Run the standardize script (using system python3)
+            # 3. Run the standardization script
             python3 scripts/standardize.py "$FILE" > deploy_generated.yml
             
-            # 2. AUTO-CREATE FOLDERS
-            # Extracts service name and creates /mnt/shared/swarm/<service>
-            python3 -c "
-import yaml
-with open('$FILE') as f:
-    d = yaml.safe_load(f)
-    for s in d.get('services', {}):
-        print(s.lower().replace(' ', ''))
-            " | while read SERVICE_SLUG; do
+            # 4. Auto-Create Folders
+            # Run the temp script we made above against the current file
+            python3 extract_services.py "$FILE" | while read SERVICE_SLUG; do
                 TARGET_DIR="/mnt/shared/swarm/$SERVICE_SLUG"
                 echo "Ensuring directory exists: $TARGET_DIR"
                 sudo mkdir -p "$TARGET_DIR"
                 sudo chown -R 1000:1000 "$TARGET_DIR"
             done
 
-            # 3. Deploy
+            # 5. Deploy
             echo "Deploying stack: $STACK_NAME"
             docker stack deploy -c deploy_generated.yml "$STACK_NAME"
             
             # Cleanup
             rm deploy_generated.yml
           done
+          
+          # Remove the temp script
+          rm extract_services.py
