@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'stacks/**.yml'
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -12,8 +13,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # CHANGED: Use apt instead of pip for Debian 12 compatibility
       - name: Install Python Dependencies
-        run: pip3 install pyyaml
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-yaml
 
       - name: Detect Changed Files and Deploy
         run: |
@@ -29,16 +33,11 @@ jobs:
             echo "Processing $FILE..."
             STACK_NAME=$(basename "$FILE" .yml)
             
-            # 1. Run the standardize script
+            # 1. Run the standardize script (using system python3)
             python3 scripts/standardize.py "$FILE" > deploy_generated.yml
             
             # 2. AUTO-CREATE FOLDERS
-            # We look for the service name in the generic file to create the folder.
-            # This loops through services in the file to create /mnt/shared/swarm/<service>
-            # It creates the dir if it doesn't exist, and forces ownership to 1000:1000
-            
-            # Extract service names using yq or simple grep/python. 
-            # Since we have python, let's use a quick inline script for robust parsing:
+            # Extracts service name and creates /mnt/shared/swarm/<service>
             python3 -c "
 import yaml
 with open('$FILE') as f:
