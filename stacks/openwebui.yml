@@ -1,45 +1,37 @@
 version: '3.3'
 services:
-  ntfy:
-    image: binwiederhier/ntfy:latest
-    command:
-     - serve
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
     environment:
-      NTFY_ATTACHMENT_CACHE_DIR: /var/lib/ntfy/attachments
-      NTFY_BASE_URL: http://ntfy.donahuenet.xyz
-      NTFY_BEHIND_PROXY: 'true'
-      NTFY_ENABLE_LOGIN: 'true'
-      TZ: '"America/Indiana/Indianapolis"'
-    ports:
-     - 8150:80
+      ENABLE_RAG_WEB_SEARCH: 'True'
+      RAG_WEB_SEARCH_CONCURRENT_REQUESTS: '10'
+      RAG_WEB_SEARCH_ENGINE: '"searxng"'
+      RAG_WEB_SEARCH_RESULT_COUNT: '3'
+      SEARXNG_QUERY_URL: '"https://searx.donahuenet.xyz/search?q="'
     volumes:
-     - /mnt/shared/swarm/ntfy/cache:/var/cache/ntfy
-     - /mnt/shared/swarm/ntfy:/etc/ntfy
-     - /mnt/shared/swarm/ntfy/cache.db:/var/lib/ntfy/cache.db
-     - /mnt/shared/swarm/ntfy/auth.db:/var/lib/ntfy/auth.db
-     - /mnt/shared/swarm/ntfy/attachments:/var/lib/ntfy/attachments
+     - /mnt/shared/swarm/webui:/app/backend/data
     networks:
      - traefik-public
     logging:
       driver: json-file
     deploy:
       labels:
+        traefik.http.routers.webui.service: webui-svc
         homepage.group: Services
-        traefik.http.routers.ntfy-rtr.middlewares: ntfy-ratelimit,ntfy-inflight
-        traefik.http.routers.ntfy-rtr.rule: Host(`ntfy.donahuenet.xyz`)
-        traefik.http.middlewares.ntfy-ratelimit.ratelimit.average: '100'
-        traefik.http.services.ntfy-svc.loadbalancer.server.port: '80'
-        homepage.href: https://ntfy.donahuenet.xyz
-        traefik.http.routers.ntfy-rtr.service: ntfy-svc
-        homepage.icon: ntfy.png
-        homepage.name: Ntfy
-        traefik.http.routers.ntfy-rtr.entrypoints: websecure
-        homepage.siteMonitor: http://ntfy:80
-        traefik.http.middlewares.ntfy-ratelimit.ratelimit.burst: '50'
-        homepage.description: Push Notifications
-        traefik.http.routers.ntfy-rtr.tls: 'true'
+        traefik.http.middlewares.webui-inflight.inflightreq.amount: '50'
+        traefik.http.middlewares.webui-ratelimit.ratelimit.average: '100'
+        homepage.href: https://donai.donahuenet.xyz
+        homepage.icon: open-webui.png
+        traefik.http.routers.webui.middlewares: webui-ratelimit,webui-inflight
+        homepage.name: Open WebUI
+        traefik.http.services.webui-svc.loadbalancer.server.port: '8080'
+        homepage.siteMonitor: http://open-webui:8080
+        homepage.description: AI Chat Interface
+        traefik.http.middlewares.webui-ratelimit.ratelimit.burst: '50'
         traefik.enable: 'true'
-        traefik.http.middlewares.ntfy-inflight.inflightreq.amount: '50'
+        traefik.http.routers.webui.rule: Host(`donai.donahuenet.xyz`)
+        traefik.http.routers.webui.tls: 'true'
+        traefik.http.routers.webui.entrypoints: websecure
       restart_policy:
         condition: on-failure
 networks:
