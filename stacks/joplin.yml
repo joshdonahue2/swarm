@@ -1,0 +1,71 @@
+version: '3.3'
+services:
+  joplin:
+    image: joplin/server:latest
+    environment:
+      APP_BASE_URL: https://joplin.donahuenet.xyz
+      APP_PORT: '22300'
+      DB_CLIENT: pg
+      MAILER_AUTH_PASSWORD: Daisy54!
+      MAILER_AUTH_USER: joshdonahue2@gmail.com
+      MAILER_ENABLED: '0'
+      MAILER_HOST: smtp.gmail.com
+      MAILER_NOREPLY_EMAIL: joshdonahue2@gmail.com
+      MAILER_NOREPLY_NAME: Joplin
+      MAILER_PORT: '465'
+      MAILER_SECURE: '1'
+      POSTGRES_DATABASE: joplin
+      POSTGRES_HOST: joplindb
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_USER: postgres
+    networks:
+     - joplin
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      mode: replicated
+      replicas: 0 # Change to 1 to start service
+      labels:
+        traefik.enable: 'true'
+        traefik.http.routers.joplin.entrypoints: websecure
+        traefik.http.routers.joplin.rule: Host(`joplin.donahuenet.xyz`)
+        traefik.http.routers.joplin.service: joplin-svc
+        # Added TLS
+        traefik.http.routers.joplin.tls: 'true'
+        traefik.http.services.joplin-svc.loadbalancer.server.port: '22300'
+        
+        # --- Runaway Protection ---
+        traefik.http.middlewares.joplin-ratelimit.ratelimit.average: '100'
+        traefik.http.middlewares.joplin-ratelimit.ratelimit.burst: '50'
+        traefik.http.middlewares.joplin-inflight.inflightreq.amount: '50'
+        traefik.http.routers.joplin.middlewares: joplin-ratelimit,joplin-inflight
+      restart_policy:
+        condition: on-failure
+
+  joplindb:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: joplin
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    ports:
+     - 5432:5432
+    volumes:
+     - /mnt/shared/swarm/joplin/db:/var/lib/postgresql/data
+    networks:
+     - joplin
+    logging:
+      driver: json-file
+    deploy:
+      mode: replicated
+      replicas: 0 # Change to 1 to start service
+      restart_policy:
+        condition: on-failure
+
+networks:
+  joplin:
+    driver: overlay
+  traefik-public:
+    external: true

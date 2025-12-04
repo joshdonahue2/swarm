@@ -1,0 +1,55 @@
+version: '3.3'
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: donahuenet.xyz
+      TZ: ''
+    volumes:
+     - /mnt/shared/swarm/homepage:/app/config
+     - /mnt/shared/swarm/homepage/images:/app/public/images
+     - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+     - traefik-public
+    secrets:
+     - ha_lebanon_token_v2
+     - ha_tipton_token_v2
+     - proxmox_prod_secret_v2
+     - proxmox_test_secret_v2
+     - truenas_core_password_v2
+     - truenas_lebanon_password_v2
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        traefik.http.routers.homepage-rtr.tls: 'true'
+        traefik.http.middlewares.homepage-inflight.inflightreq.amount: '50'
+        traefik.http.middlewares.homepage-ratelimit.ratelimit.burst: '50'
+        traefik.http.routers.homepage-rtr.middlewares: homepage-ratelimit,homepage-inflight
+        traefik.http.routers.homepage-rtr.rule: Host(`donahuenet.xyz`) || Host(`www.donahuenet.xyz`)
+        traefik.http.services.homepage-svc.loadbalancer.server.port: '3000'
+        traefik.http.routers.homepage-rtr.service: homepage-svc
+        traefik.http.routers.homepage-rtr.entrypoints: websecure
+        traefik.enable: 'true'
+        traefik.http.middlewares.homepage-ratelimit.ratelimit.average: '100'
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+         - node.role == manager
+networks:
+  traefik-public:
+    external: true
+secrets:
+  ha_lebanon_token_v2:
+    external: true
+  ha_tipton_token_v2:
+    external: true
+  proxmox_prod_secret_v2:
+    external: true
+  proxmox_test_secret_v2:
+    external: true
+  truenas_core_password_v2:
+    external: true
+  truenas_lebanon_password_v2:
+    external: true

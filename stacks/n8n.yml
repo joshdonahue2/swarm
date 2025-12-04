@@ -1,0 +1,149 @@
+version: '3.3'
+services:
+  n8n:
+    image: ghcr.io/joshdonahue2/n8n-custom:latest
+    user: 1000:3000
+    environment:
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PASSWORD: nonpostgres
+      DB_POSTGRESDB_PORT: '5432'
+      DB_POSTGRESDB_USER: nonpostgres
+      DB_TYPE: postgresdb
+      EXECUTIONS_MODE: queue
+      GENERIC_TIMEZONE: America/Indiana/Indianapolis
+      N8N_DATA_TABLES_MAX_SIZE_BYTES: '1000000000'
+      N8N_DEFAULT_POLLING_INTERVAL: '1'
+      N8N_ENCRYPTION_KEY: kdufheojdd93k3n58f34nfkf7rfk
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: 'true'
+      N8N_POLL_FILE_SYSTEM_TRIGGER: 'true'
+      N8N_RUNNERS_ENABLED: 'true'
+      N8N_TRUST_PROXY: 'true'
+      NODE_FUNCTION_ALLOW_BUILTIN: crypto
+      NODE_OPTIONS: --max_old_space_size=4096
+      OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS: 'true'
+      PUPPETEER_ARGS_NO_SANDBOX: 'true'
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium-browser
+      QUEUE_BULL_REDIS_HOST: redis
+      QUEUE_HEALTH_CHECK_ACTIVE: 'true'
+      WEBHOOK_URL: https://n8n.donahuenet.xyz
+    volumes:
+     - /mnt/shared/swarm/n8n/n8n:/home/node/.n8n
+     - /mnt/shared/swarm/n8n/local-files:/files
+     - /mnt/shared/swarm/obsidian/vault/vault:/vault
+    networks:
+     - n8n-network
+     - traefik-public
+    logging:
+      driver: json-file
+    deploy:
+      labels:
+        traefik.http.middlewares.n8n-inflight.inflightreq.amount: '50'
+        homepage.group: Developer
+        traefik.http.routers.n8n.entrypoints: websecure
+        homepage.href: https://n8n.donahuenet.xyz
+        traefik.http.routers.n8n.rule: Host(`n8n.donahuenet.xyz`)
+        homepage.icon: n8n.png
+        homepage.name: n8n
+        homepage.siteMonitor: http://n8n:5678
+        homepage.description: Workflow Automation
+        traefik.http.routers.n8n.middlewares: n8n-ratelimit,n8n-inflight
+        traefik.http.routers.n8n.tls: 'true'
+        traefik.http.services.n8n.loadbalancer.server.port: '5678'
+        traefik.http.middlewares.n8n-ratelimit.ratelimit.average: '100'
+        traefik.http.middlewares.n8n-ratelimit.ratelimit.burst: '50'
+        traefik.enable: 'true'
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 4096M
+  n8n-worker:
+    image: ghcr.io/joshdonahue2/n8n-custom:latest
+    command:
+     - worker
+    user: 1000:3000
+    environment:
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PASSWORD: nonpostgres
+      DB_POSTGRESDB_PORT: '5432'
+      DB_POSTGRESDB_USER: nonpostgres
+      DB_TYPE: postgresdb
+      EXECUTIONS_MODE: queue
+      GENERIC_TIMEZONE: America/Indiana/Indianapolis
+      N8N_DEFAULT_POLLING_INTERVAL: '1'
+      N8N_ENCRYPTION_KEY: kdufheojdd93k3n58f34nfkf7rfk
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: 'true'
+      N8N_POLL_FILE_SYSTEM_TRIGGER: 'true'
+      N8N_TRUST_PROXY: 'true'
+      NODE_FUNCTION_ALLOW_BUILTIN: crypto
+      NODE_OPTIONS: --max_old_space_size=4096
+      PUPPETEER_ARGS_NO_SANDBOX: 'true'
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium-browser
+      QUEUE_BULL_REDIS_HOST: redis
+      QUEUE_HEALTH_CHECK_ACTIVE: 'true'
+      WEBHOOK_URL: https://n8n.donahuenet.xyz
+    volumes:
+     - /mnt/shared/swarm/n8n/n8n:/home/node/.n8n
+     - /mnt/shared/swarm/n8n/local-files:/files
+     - /mnt/shared/swarm/obsidian/vault/vault:/vault
+    networks:
+     - n8n-network
+    logging:
+      driver: json-file
+    deploy:
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          memory: 4096M
+  postgres:
+    image: postgres:16
+    healthcheck:
+      test:
+       - CMD-SHELL
+       - pg_isready -h localhost -U postgres -d n8n
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      POSTGRES_DB: n8n
+      POSTGRES_NON_ROOT_PASSWORD: nonpostgres
+      POSTGRES_NON_ROOT_USER: nonpostgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    volumes:
+     - /mnt/shared/swarm/n8n/postgres:/var/lib/postgresql/data
+     - /mnt/shared/swarm/n8n/init-data.sh:/docker-entrypoint-initdb.d/init-data.sh
+    networks:
+     - n8n-network
+    logging:
+      driver: json-file
+    deploy:
+      restart_policy:
+        condition: on-failure
+  redis:
+    image: redis:6-alpine
+    healthcheck:
+      test:
+       - CMD
+       - redis-cli
+       - ping
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+     - /mnt/shared/swarm/n8n/redis:/data
+    networks:
+     - n8n-network
+    logging:
+      driver: json-file
+    deploy:
+      restart_policy:
+        condition: on-failure
+networks:
+  n8n-network:
+    driver: overlay
+  traefik-public:
+    external: true
