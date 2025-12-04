@@ -1,11 +1,10 @@
-name: Deploy All Stacks
+name: Deploy Stack to Swarm
 
 on:
   push:
     paths:
       - 'stacks/**'
       - 'scripts/**'
-      - '.github/workflows/**'
 
 jobs:
   deploy:
@@ -14,33 +13,49 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 2 # Important: We need history to see what changed
 
-      # ---------------------------------------------------------
-      # REMOVED the "Install Python Dependencies" step entirely.
-      # We assume you ran the apt install command manually once.
-      # ---------------------------------------------------------
-
-      - name: Process Stacks
-        # We just use the python3 installed on the system
+      - name: Process Stacks (Prepare Files)
+        # We still generate ALL files because it's super fast (milliseconds)
         run: python3 scripts/process_stacks.py
 
-      - name: Deploy to Swarm
+      - name: Deploy CHANGED Stacks Only
         run: |
-          echo "🚀 Starting Deployment Loop..."
+          echo "🔎 Checking for changed files..."
           
-          if [ -d "ready_to_deploy" ]; then
-            for file in ready_to_deploy/*.yml; do
-              [ -e "$file" ] || continue
-              
-              stack_name=$(basename "$file" .yml)
-              
+          # 1. Get list of changed files in the 'stacks/' folder
+          # We compare the current commit (HEAD) with the previous one (HEAD~1)
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep '^stacks/.*\.yml$' || true)
+          
+          # 2. Check if the SCRIPT itself changed. 
+          # If the script changed, we must redeploy EVERYTHING to apply new logic (like the siteMonitor fix).
+          SCRIPT_CHANGED=$(git diff --name-only HEAD~1 HEAD | grep '^scripts/' || true)
+
+          if [ -n "$SCRIPT_CHANGED" ]; then
+            echo "⚠️  Script updated! Redeploying ALL stacks to apply logic changes..."
+            TARGET_FILES="stacks/*.yml"
+          else
+            if [ -z "$CHANGED_FILES" ]; then
+              echo "✅ No stack files changed. Nothing to deploy."
+              exit 0
+            fi
+            echo "📝 Detected changes in: $CHANGED_FILES"
+            TARGET_FILES="$CHANGED_FILES"
+          fi
+
+          # 3. Deployment Loop
+          for source_file in $TARGET_FILES; do
+            # The source file is "stacks/myapp.yml", but we need "ready_to_deploy/myapp.yml"
+            filename=$(basename "$source_file")
+            deploy_file="ready_to_deploy/$filename"
+            stack_name="${filename%.*}" # Remove .yml extension
+
+            if [ -f "$deploy_file" ]; then
               echo "---------------------------------"
               echo "🐳 Deploying Stack: $stack_name"
-              
-              docker stack deploy -c "$file" "$stack_name" --prune
-            done
-          else
-            echo "⚠️ No stacks found to deploy."
-          fi
-          
-          echo "✅ All stacks updated!"
+              docker stack deploy -c "$deploy_file" "$stack_name" --prune
+            else
+              echo "⚠️  Warning: $deploy_file not found (Did you delete the stack?)"
+            fi
+          done
