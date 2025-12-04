@@ -1,30 +1,46 @@
-name: Deploy Stack Locally
+name: Deploy All Stacks
 
 on:
   push:
-    branches:
-      - main
     paths:
-      - 'docker-compose.prod.yml'
+      - 'stacks/**'
+      - 'scripts/**'
 
 jobs:
-  deploy_local:
-    # THIS is the magic change. It tells GitHub to use YOUR server, not theirs.
-    runs-on: self-hosted
+  deploy:
+    runs-on: self-hosted  # Assuming you are using the local runner from previous steps
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Dependencies
+        run: pip install pyyaml
+
+      - name: Process Stacks
+        run: python scripts/process_stacks.py
+        # This reads stacks/*.yml and saves them to ready_to_deploy/*.yml
+
       - name: Deploy to Swarm
         run: |
-          # We are already on the server!
-          # The code is checked out to the runner's work directory.
+          echo "🚀 Starting Deployment Loop..."
           
-          echo "Deploying from local runner..."
+          # Loop through every file in the output folder
+          for file in ready_to_deploy/*.yml; do
+            # Extract filename without extension (e.g., 'plex.yml' -> 'plex')
+            stack_name=$(basename "$file" .yml)
+            
+            echo "---------------------------------"
+            echo "🐳 Deploying Stack: $stack_name"
+            
+            # Deploy using the generated file
+            docker stack deploy -c "$file" "$stack_name" --prune
+            
+          done
           
-          # Deploy directly using the file in the current workspace
-          docker stack deploy -c docker-compose.prod.yml main_stack
-          
-          # Optional: Prune old unused images to save space on your local drive
-          docker system prune -f
+          echo "✅ All stacks updated!"
