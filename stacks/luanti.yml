@@ -17,5 +17,5 @@ services:
       - TZ=Etc/UTC
       - "CLI_ARGS=--gameid devtest" #optional
     volumes:
-      - /path/to/luanti/data:/config/.minetest
+      - data:/config/.minetest
     restart: unless-stopped
