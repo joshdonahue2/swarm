@@ -22,9 +22,9 @@ def process_file(filepath):
     # --- MODE CHECK ---
     # If no x-nodel-config, we treat this as a "Raw" file (Power User Mode)
     if 'x-nodel-config' not in data:
-        print(f"   ℹ️  No auto-config found. Deploying in 'Raw Mode' (Preserving your custom labels).")
+        print(f"   ℹ️  No auto-config found. Deploying in 'Raw Mode'.")
         
-        # Just ensure the network exists, then save and exit
+        # Ensure network exists
         if 'networks' not in data: data['networks'] = {}
         if TRAEFIK_NETWORK not in data['networks']:
             data['networks'][TRAEFIK_NETWORK] = {'external': True}
@@ -35,7 +35,6 @@ def process_file(filepath):
         return
 
     # --- AUTO-GENERATION MODE ---
-    # This runs ONLY if x-nodel-config IS present
     print(f"   ✨ Auto-generating labels...")
     config = data.get('x-nodel-config', {})
     
@@ -63,10 +62,13 @@ def process_file(filepath):
                 f"traefik.http.routers.{first_service_name}.entrypoints=websecure",
                 f"traefik.http.routers.{first_service_name}.tls.certresolver=myresolver",
                 f"traefik.http.services.{first_service_name}.loadbalancer.server.port={port}",
+                
+                # Homepage Labels
                 f"homepage.group={group}",
                 f"homepage.name={first_service_name.capitalize()}",
                 f"homepage.icon={icon}",
-                f"homepage.href=https://{url}"
+                f"homepage.href=https://{url}",
+                f"homepage.siteMonitor=http://{first_service_name}:{port}"  # <--- NEW LINE ADDED HERE
             ]
             
             for l in new_labels:

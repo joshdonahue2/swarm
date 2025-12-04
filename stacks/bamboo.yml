@@ -5,7 +5,7 @@ x-nodel-config:
   url: bamboo.donahuenet.xyz
   port: 3000
   group: Services
-  icon: bambustudio.png
+  icon: bambu.png
 # ----------------
 
 services:
